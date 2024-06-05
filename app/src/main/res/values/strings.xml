@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">Flight Search</string>
+    <string name="airport_list">Searching AirPort</string>
+    <string name="back_button">Back</string>
+
+    <string name="favorite_routes">Favorite routes</string>
+
+    <string name="help">
+        Search Tip : [Input iata_code]\n
+        OPO, ARN, WAW, MRS, BGY, VIE, SVO, DUB, SOF, CPH,
+        BRU, FCO, ATH, BCN, DUS, GVA, KEF, HER, BSL, AGP,
+        HEL, HAM, AMS, CDG, MAD, FRA, TXL, MUC, ALC, ZRH,
+        LYS, OSL, LIS
+    </string>
+    <string name="search_hint">Enter departure airport</string>
+    <string name="searching">Search Result</string>
+
+    <string name="depart">● DEPART : </string>
+    <string name="arrive">● ARRIVE : </string>
+
+    <string name="error01">ERROR 01: A code that does not exist has been entered.</string>
+    <string name="empty_favorite">There is no favorite routes.\nSearch and save your favorite routes.</string>
+    <string name="empty_airport">There is no Airport routes.\nPlease clarify the search term.</string>
+</resources>
