@@ -34,9 +34,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,15 +49,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flightsearch.FlightSearchTopAppBar
 import com.example.flightsearch.R
+import com.example.flightsearch.data.airport.AirPort
 import com.example.flightsearch.data.favorite.Favorite
 import com.example.flightsearch.ui.AppViewModelProvider
 import com.example.flightsearch.ui.navigation.NavigationDestination
 import com.example.flightsearch.ui.theme.FlightSearchTheme
+import kotlinx.coroutines.launch
 
 object HomeDestination: NavigationDestination {
     override val route: String = "home"
     override val titleRes: Int = R.string.app_name
 }
+
+private lateinit var airPortList: List<AirPort>
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,9 +70,10 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    var userInput by rememberSaveable { mutableStateOf("") }
-    val itemList by viewModel.getAllFavorite().collectAsState(emptyList())
+    airPortList = viewModel.getAllAirPort().collectAsState(initial = emptyList()).value
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -84,10 +87,14 @@ fun HomeScreen(
 
     ) {
         HomeBody(
-            itemList = itemList,
+            itemList = uiState.favoriteList,
             contentPadding = it,
             onClicked = { navigateToItemSearch() },
-            onValueChange = { userInput = it },
+            favoriteButton = {
+                coroutineScope.launch {
+                    viewModel.deleteFavorite(it)
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = it.calculateTopPadding() + dimensionResource(R.dimen.padding_large))
@@ -99,19 +106,15 @@ fun HomeScreen(
 fun HomeBody(
     modifier: Modifier = Modifier,
     itemList: List<Favorite>,
-    onValueChange: (String) -> Unit,
     onClicked: () -> Unit,
+    favoriteButton: (Favorite) -> Unit,
     contentPadding: PaddingValues
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
     ) {
-        EditTextField(
-            onClicked = onClicked,
-            onValueChange = onValueChange
-        )
-        Spacer(modifier = Modifier.height(10.dp))
+        EditTextField(onClicked = onClicked)
         Text(
             text = stringResource(R.string.favorite_routes),
             fontWeight = FontWeight.Bold,
@@ -120,10 +123,10 @@ fun HomeBody(
                 .align(Alignment.Start)
                 .padding(dimensionResource(R.dimen.padding_large))
         )
-        Spacer(modifier = Modifier.height(10.dp))
         FavoriteList(
             itemList = itemList,
-            contentPadding = contentPadding
+            contentPadding = contentPadding,
+            favoriteButton = favoriteButton
         )
     }
 }
@@ -131,7 +134,6 @@ fun HomeBody(
 @Composable
 fun EditTextField(
     modifier: Modifier = Modifier,
-    onValueChange: (String) -> Unit,
     onClicked: () -> Unit
 ) {
     Button(
@@ -141,7 +143,7 @@ fun EditTextField(
         TextField(
             enabled = false,
             value = "",
-            onValueChange = onValueChange,
+            onValueChange = { it },
             label = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
             trailingIcon = { Icon(painter = painterResource(R.drawable.baseline_mic_24), contentDescription = null) },
@@ -154,13 +156,7 @@ fun EditTextField(
                 disabledTrailingIconColor = Color.Black.copy(alpha = 0.6f),
                 disabledLabelColor = Color.Black.copy(alpha = 0.6f),
                 disabledContainerColor = colorResource(R.color.skyblue),
-                unfocusedContainerColor = colorResource(R.color.skyblue),
-                focusedContainerColor = colorResource(R.color.skyblue),
-                errorContainerColor = colorResource(R.color.skyblue),
-                disabledIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                errorIndicatorColor = Color.Transparent
+                disabledIndicatorColor = Color.Transparent
             )
         )
     }
@@ -170,6 +166,7 @@ fun EditTextField(
 fun FavoriteList(
     itemList: List<Favorite>,
     contentPadding: PaddingValues,
+    favoriteButton: (Favorite) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (itemList.isEmpty()) {
@@ -187,7 +184,7 @@ fun FavoriteList(
                     item = item,
                     modifier = modifier
                         .padding(dimensionResource(R.dimen.padding_small)),
-                    favoriteButton = {}
+                    favoriteButton = favoriteButton
                 )
             }
         }
@@ -198,7 +195,7 @@ fun FavoriteList(
 fun FavoriteItem(
     item: Favorite,
     modifier: Modifier = Modifier,
-    favoriteButton: () -> Unit = {}
+    favoriteButton: (Favorite) -> Unit = {}
 ) {
     Card(
         modifier = modifier,
@@ -222,7 +219,7 @@ fun FavoriteItem(
                 ) {
                     Text(text = item.departureCode, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(text = item.departureCode)
+                    Text(text = codeToDescription(item.departureCode))
                 }
                 Spacer(modifier = Modifier.height(5.dp))
                 Text(
@@ -234,37 +231,24 @@ fun FavoriteItem(
                 ) {
                     Text(text = item.destinationCode, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(text = item.destinationCode)
+                    Text(text = codeToDescription(item.destinationCode))
                 }
             }
             IconButton(
                 modifier = Modifier
                     .requiredHeight(48.dp)
                     .weight(1f),
-                onClick = favoriteButton
+                onClick = {
+                    favoriteButton.invoke(item)
+                }
             ) {
                 Icon(
                     modifier = Modifier.fillMaxSize(),
                     imageVector = Icons.Filled.Star,
-                    contentDescription = null
+                    contentDescription = null,
+                    tint = Color.Yellow
                 )
             }
-        }
-    }
-}
-
-@Preview
-@Composable
-fun ItemListPreView() {
-    FlightSearchTheme {
-        Surface {
-            val itemList = listOf(
-                Favorite(0, "FCO", "SVO"),
-                Favorite(1, "FCO", "MUC"),
-                Favorite(2, "FCO", "LIS"),
-            )
-
-            FavoriteList(itemList = itemList, contentPadding = PaddingValues(0.dp))
         }
     }
 }
@@ -277,4 +261,17 @@ fun ItemPreView() {
             FavoriteItem(item = Favorite(0, "FCO", "SVO"))
         }
     }
+}
+
+fun codeToDescription(code: String): String {
+    var description = ""
+
+    for (i in airPortList.indices) {
+        if (airPortList[i].iataCode == code) {
+            description = airPortList[i].name
+            break
+        }
+    }
+
+    return description
 }

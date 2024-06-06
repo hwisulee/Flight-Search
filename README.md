@@ -39,3 +39,7 @@ https://developer.android.com/codelabs/basic-android-kotlin-compose-flight-searc
 4. User Input -> Search Result
 
 ![image](https://github.com/hwisulee/weatherApp/assets/62528282/9529b191-e943-4fed-9dd6-ca2114a24c1b)
+
+5. Favorite Button Clicked(Insert) -> Home Screen -> Favorite Button Clicked(Delete)
+
+![2](https://github.com/hwisulee/Flight-Search/assets/62528282/5c1b25b5-67f0-4b53-9fdd-a0e6e0608f5a)

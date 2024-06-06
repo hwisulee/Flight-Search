@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,10 +60,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flightsearch.FlightSearchTopAppBar
 import com.example.flightsearch.R
 import com.example.flightsearch.data.airport.AirPort
+import com.example.flightsearch.data.favorite.Favorite
 import com.example.flightsearch.ui.AppViewModelProvider
 import com.example.flightsearch.ui.home.HomeViewModel
 import com.example.flightsearch.ui.navigation.NavigationDestination
 import kotlinx.coroutines.android.awaitFrame
+import kotlinx.coroutines.launch
 
 object ItemSearchDestination: NavigationDestination {
     override val route: String = "item_search"
@@ -70,8 +73,8 @@ object ItemSearchDestination: NavigationDestination {
 
 }
 
-lateinit var airPortList: List<AirPort>
-lateinit var itemList: List<Pair<String, String>>
+private lateinit var airPortList: List<AirPort>
+private lateinit var itemList: List<Pair<String, String>>
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,9 +85,9 @@ fun ItemSearchScreen(
     canNavigateBack: Boolean = true,
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val homeUiState by viewModel.uiState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    var userInput by rememberSaveable { mutableStateOf(homeUiState.userInput) }
+    var userInput by rememberSaveable { mutableStateOf("") }
     airPortList = viewModel.getAllAirPort().collectAsState(initial = emptyList()).value
     itemList = aTobListMaker(airPortList)
 
@@ -105,12 +108,13 @@ fun ItemSearchScreen(
             value = userInput,
             result = stringResource(R.string.searching),
             keyboardActions = {
-                viewModel.updateUserInput(userInput)
                 this.defaultKeyboardAction(ImeAction.Done)
             },
             onValueChange = { userInput = it },
             favoriteButton = {
-                viewModel.updateUserInput("")
+                coroutineScope.launch {
+                    viewModel.insertFavorite(Favorite(0, it.first, it.second))
+                }
                 navigateBack()
             },
             modifier = Modifier
@@ -127,7 +131,7 @@ fun SearchBody(
     value: String,
     itemList: List<Pair<String, String>>,
     onValueChange: (String) -> Unit,
-    favoriteButton: () -> Unit,
+    favoriteButton: (Pair<String, String>) -> Unit,
     keyboardActions: (KeyboardActionScope.() -> Unit)?,
     contentPadding: PaddingValues
 ) {
@@ -245,7 +249,7 @@ fun EditTextField(
 @Composable
 fun AirPortList(
     itemList: List<Pair<String, String>>,
-    favoriteButton: () -> Unit,
+    favoriteButton: (Pair<String, String>) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier
 ) {
@@ -275,7 +279,7 @@ fun AirPortList(
 fun AirPortItem(
     item: Pair<String, String>,
     modifier: Modifier = Modifier,
-    favoriteButton: () -> Unit = {}
+    favoriteButton: (Pair<String, String>) -> Unit = {}
 ) {
     Card(
         modifier = modifier.height(200.dp),
@@ -317,7 +321,9 @@ fun AirPortItem(
                 modifier = Modifier
                     .requiredHeight(36.dp)
                     .weight(1f),
-                onClick = favoriteButton
+                onClick = {
+                    favoriteButton.invoke(Pair(item.first, item.second))
+                }
             ) {
                 Icon(
                     modifier = Modifier.fillMaxSize(),
